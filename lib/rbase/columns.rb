@@ -4,46 +4,46 @@ module RBase
     # Base class for all column types
     class Column
       @@types = {}
-      
+
       # Assigns column type string to current class
       def self.column_type(type)
         @type = type
         @@types[type] = self
       end
-      
+
       # Returns column type class that correspond to given column type string
       def self.column_for(type)
         throw "Unknown column type '#{type}'" unless @@types.has_key?(type)
         @@types[type]
       end
-      
+
       # Returns column type as 1 character string
       def self.type
         @type
       end
-      
+
       # Returns column type as 1 character string
       def type
         self.class.type
       end
-      
+
       # Column name
       attr_reader :name
-      
+
       # Column offset from the beginning of the record
       attr_reader :offset
-      
+
       # Column size in characters
       attr_reader :size
-      
+
       # Number of decimal places
       attr_reader :decimal
 
       def initialize(name, options = {})
         options.merge({:name => name, :type => self.class.type}).each { |k, v| self.instance_variable_set("@#{k}", v) }
       end
-      
-      
+
+
       def attach_to(table)
         @table = table
       end
@@ -61,9 +61,9 @@ module RBase
       def inspect
         "#{name}(type=#{type}, size=#{size})"
       end
-      
+
       protected
-      
+
       def table
         @table
       end
@@ -72,14 +72,14 @@ module RBase
 
     class CharacterColumn < Column
       column_type 'C'
-      
+
       def initialize(name, options = {})
         if options[:size] && options[:decimal]
-          size = options[:decimal]*256 + options[:size] 
+          size = options[:decimal]*256 + options[:size]
         else
           size = options[:size] || 254
         end
-        
+
         super name, options.merge(:size => size)
 
         if options[:encoding]
@@ -87,7 +87,7 @@ module RBase
           @pack_converter = Encoder.new('utf-8', options[:encoding])
         end
       end
-      
+
       def pack(value)
 	      value = value.to_s
         value = @pack_converter.en(value) if @pack_converter
@@ -108,14 +108,14 @@ module RBase
 
     class NumberColumn < Column
       column_type 'N'
-      
+
       def initialize(name, options = {})
         size = options[:size] || 18
         size = 18 if size > 18
-        
+
         super name, options.merge(:size => size)
       end
-      
+
       def pack(value)
         if value
           if float?
@@ -130,7 +130,11 @@ module RBase
 
       def unpack(data)
         return nil if data.strip == ''
-        data.rstrip.to_i
+        if float?
+          data.rstrip.to_f
+        else
+          data.rstrip.to_i
+        end
       end
 
       def inspect
@@ -149,7 +153,7 @@ module RBase
 
     class LogicalColumn < Column
       column_type 'L'
-      
+
       def initialize(name, options = {})
         super name, options.merge(:size => 1)
       end
@@ -181,7 +185,7 @@ module RBase
 
     class DateColumn < Column
       column_type 'D'
-      
+
       def initialize(name, options = {})
         super name, options.merge(:size => 8)
       end
@@ -199,20 +203,20 @@ module RBase
         "#{name}(date)"
       end
     end
-    
-    
+
+
     class MemoColumn < Column
       column_type 'M'
-      
+
       def initialize(name, options = {})
         super name, options.merge(:size => 10)
       end
-      
+
       def pack(value)
         packed_value = table.memo.write(value)
         [format("%-10d", packed_value)].pack('A10')
       end
-      
+
       def unpack(data)
         table.memo.read(data.to_i)
       end
@@ -225,11 +229,11 @@ module RBase
 
     class FloatColumn < Column
       column_type 'F'
-      
+
       def initialize(name, options = {})
         super name, options.merge(:size => 20)
       end
-      
+
       def decimal
         (@decimal && @decimal <= 15) ? @decimal : 2
       end
